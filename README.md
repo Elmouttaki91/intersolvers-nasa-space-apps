@@ -27,6 +27,14 @@ npm run build
 - Comparison of five route strategies
 - Shareable route card
 
+
+## Design & Prototype
+
+Explore our UI/UX design and interactive prototype:
+
+[Figma – Intersolvers: Martian Map UI/UX](https://www.figma.com/design/hqzq3JPQZk6aGPLbdOuwM1/Intersolvers--Martian-Map-UI-UX?node-id=1-3&t=CstFsfsuDjZKwgYy-1)
+
+
 ## Data
 
 - HiRISE imagery
