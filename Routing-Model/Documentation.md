@@ -1,17 +1,22 @@
-# Murray Buttes | Mars Terrain Data Preparation & Explainable Route Planning
+# Murray Buttes \| Mars Terrain Data Preparation & Explainable Route Planning
 
 An experimental, terrain-aware and explainable route-planning prototype for a hypothetical astronaut traverse in **Murray Buttes, Gale Crater, Mars**. The project combines two reproducible research stages: **(1) preparing a spatially aligned planetary terrain dataset** and **(2) comparing routes by modeled walking energy and terrain constraints**.
 
 **Project status:** Educational NASA Space Apps Challenge prototype, not a certified EVA navigation or hazard-assessment system.
 
+## Important Note
+The original `Murray Buttes GIS.zip` dataset is not included in this repository because it exceeds GitHub's 100 MB file-size limit.
+Download the dataset from: https://doi.org/10.5281/zenodo.3990487
+Place the downloaded ZIP file in `data/raw/` before running the data-preparation notebook.
+
 ### At a glance
 
-- **248,502** cells on a **499 × 498** grid at approximately **1 m** spacing in the prepared study region.
-- **17** columns in the master terrain table exported by the data-preparation notebook.
-- Integrates elevation, slope, roughness, HiRISE optical features, qualitative THEMIS values, geological polygons, and an existing suspected-artifact flag.
-- Compares energy-minimizing routing with distance and optional avoidance alternatives; records reconstruction warnings and experimental uncertainty checks.
+-   **248,502** cells on a **499 × 498** grid at approximately **1 m** spacing in the prepared study region.
+-   **17** columns in the master terrain table exported by the data-preparation notebook.
+-   Integrates elevation, slope, roughness, HiRISE optical features, qualitative THEMIS values, geological polygons, and an existing suspected-artifact flag.
+-   Compares energy-minimizing routing with distance and optional avoidance alternatives; records reconstruction warnings and experimental uncertainty checks.
 
-## How the Code Works 
+## How the Code Works
 
 -   Accepts start and destination coordinates in the `(row, column)` format.
 -   Calculates a minimum-energy route with 8-neighbor Dijkstra pathfinding.
@@ -23,7 +28,7 @@ An experimental, terrain-aware and explainable route-planning prototype for a hy
 
 ## Two-stage workflow
 
-```text
+``` text
 Six source inputs in data/raw/
         |
         v
@@ -35,7 +40,7 @@ notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb
 data/Murray_Buttes_Terrain_Data.csv  (248,502 rows × 17 columns)
         |
         v
-Route-planning notebook (configure input CSV path if needed)
+notebooks/Murray_Buttes_Route_Planner.ipynb
         |
         v
 Route alternatives + energy estimates + artifact warnings + figures
@@ -45,17 +50,17 @@ Route alternatives + energy estimates + artifact warnings + figures
 
 **Notebook:** [`notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb`](notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb)
 
-1. **Validate grid alignment.** Read the 1 m DEM, slope raster and 0.25 m HiRISE image; check coverage, raster shape, coordinate systems and transforms. The preparation notebook intentionally stops when required spatial assumptions fail.
-2. **Calculate roughness.** Fit a local plane to valid **3 × 3 DEM** windows; derive residual surface variation rather than treating steepness itself as roughness.
-3. **Extract image features.** Compute HiRISE brightness and **5 × 5 image-pixel** texture; aggregate RGB and texture to each 1 m DEM cell. Image appearance is not a validated rock/soil classifier.
-4. **Integrate geology.** Unpack and clip mapped vector features to the study area; associate mapped butte polygons with grid cells.
-5. **Align THEMIS.** Reproject/resample the coarse **qualitative thermal-inertia** product onto the analysis grid for comparison. This **does not** increase its original physical resolution, and its image values are not calibrated thermal-inertia measurements.
-6. **Flag suspected artifacts.** Read an **existing** aligned artifact mask into `artifact_suspected`. The preparation notebook does not create or independently validate that mask and **does not interpolate DEM values**.
-7. **Validate/export.** Verify expected column names, one unique `(row, col)` per cell, grid bounds and flag consistency. Write and read back `data/Murray_Buttes_Terrain_Data.csv`.
+1.  **Validate grid alignment.** Read the 1 m DEM, slope raster and 0.25 m HiRISE image; check coverage, raster shape, coordinate systems and transforms. The preparation notebook intentionally stops when required spatial assumptions fail.
+2.  **Calculate roughness.** Fit a local plane to valid **3 × 3 DEM** windows; derive residual surface variation rather than treating steepness itself as roughness.
+3.  **Extract image features.** Compute HiRISE brightness and **5 × 5 image-pixel** texture; aggregate RGB and texture to each 1 m DEM cell. Image appearance is not a validated rock/soil classifier.
+4.  **Integrate geology.** Unpack and clip mapped vector features to the study area; associate mapped butte polygons with grid cells.
+5.  **Align THEMIS.** Reproject/resample the coarse **qualitative thermal-inertia** product onto the analysis grid for comparison. This **does not** increase its original physical resolution, and its image values are not calibrated thermal-inertia measurements.
+6.  **Flag suspected artifacts.** Read an **existing** aligned artifact mask into `artifact_suspected`. The preparation notebook does not create or independently validate that mask and **does not interpolate DEM values**.
+7.  **Validate/export.** Verify expected column names, one unique `(row, col)` per cell, grid bounds and flag consistency. Write and read back `data/Murray_Buttes_Terrain_Data.csv`.
 
 The master CSV contains the following **17 columns**:
 
-```text
+``` text
 row, col, x_mars, y_mars, elevation_m, slope_deg, roughness_m,
 themis_qualitative, valid_terrain, texture_mean, texture_max,
 butte_id, inside_butte, red_mean, green_mean, blue_mean,
@@ -68,12 +73,12 @@ artifact_suspected
 
 The routing notebook uses the prepared terrain information to evaluate permitted movements with 8-neighbor Dijkstra pathfinding, compare objectives, and produce interpretable route statistics and warnings. Its reference walking-energy model, constraints and illustrative test outputs are documented below.
 
-**Integration check before a fresh run:** The supplied route-planning documentation refers to the older input `Murray_Buttes_Master_Data/Terrain/Master_Terrain_v3.csv`. Point the routing notebook at the new `data/Murray_Buttes_Terrain_Data.csv` **only after checking that its expected columns and settings match**. The route-planning notebook itself was not part of the uploaded files inspected for this README, so end-to-end execution with the new table has not been independently verified here.
+**Data handoff:** The data-preparation stage exports `data/Murray_Buttes_Terrain_Data.csv`. The routing stage should use the corresponding terrain fields to calculate and compare candidate routes. Before reproducing results, confirm the paths and input requirements in the committed routing notebook; this document describes the workflow but does not itself execute it.
 
 ## Data sources and how they are used
 
 | Source / layer | Role in the project |
-|------------------------------------|------------------------------------|
+|----|----|
 | Digital elevation model (DEM) | Primary terrain input; movement gradients and reference walking-energy costs |
 | DEM-derived slope | Available terrain descriptor used as an important factor for path finding. |
 | DEM-derived roughness | Routing restriction based on the highest 10% of reference roughness values |
@@ -116,13 +121,15 @@ A narrow suspected elevation artifact was identified in the DEM and saved in the
 
 ## Repository layout
 
-```text
+``` text
 Repository/
 ├── README.md
+├── Documentation.md
+├── AI_DISCLOSURE.md                     # if included in the repository
 ├── environment.yml                  # if included in the repository
 ├── notebooks/
 │   ├── Murray_Buttes_Data_Preparation_GitHub.ipynb
-│   └── Murray_Buttes_Route_Planner.ipynb  # rename to your actual filename if different
+│   └── Murray_Buttes_Route_Planner.ipynb
 ├── data/
 │   ├── raw/
 │   │   ├── MSLGaleDEM_MAP2_EQUI.tif
@@ -136,31 +143,31 @@ Repository/
 └── results/                           # selected route plots and tables
 ```
 
-The six files inside `data/raw/` are **inputs** to the preprocessing notebook. Some original source rasters can exceed GitHub's file-size limit; if they are not distributed in the repository, download them separately and place them at the exact paths shown above. The **suspected-artifact mask is a project-specific prerequisite**; the preprocessing notebook does not regenerate it from the DEM. The existing README source links document upstream data provenance, but do not by themselves reproduce every project-specific cropped input.
+The six files shown inside `data/raw/` are **expected inputs** to the preprocessing notebook; the large `Murray Buttes GIS.zip` may need to be downloaded separately. Some original source rasters can exceed GitHub's file-size limit; if they are not distributed in the repository, download them separately and place them at the exact paths shown above. The **suspected-artifact mask is a project-specific prerequisite**; the preprocessing notebook does not regenerate it from the DEM. The existing README source links document upstream data provenance, but do not by themselves reproduce every project-specific cropped input.
 
 ### Run in order
 
-1. Clone/download the repository and ensure `notebooks/` and `data/raw/` exist **locally**, not only on GitHub.
-2. Install the required Python packages. If your repository includes a working `environment.yml`, create/activate it; otherwise ensure NumPy, pandas, rasterio, SciPy, GeoPandas and Shapely are installed, plus the routing notebook's dependencies.
-3. Start Jupyter from **`Repository/` or `Repository/notebooks/`**, then open `notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb` and run all cells.
-4. Confirm the printed validation checks and output `data/Murray_Buttes_Terrain_Data.csv` (17 columns).
-5. Configure the route-planning notebook's master-CSV input path/schema as needed, choose valid start/destination grid coordinates, and run its cells.
-6. Copy selected plots, warnings and summary tables into `results/` for reviewers.
+1.  Clone/download the repository and ensure `notebooks/` and `data/raw/` exist **locally**, not only on GitHub.
+2.  Install the required Python packages. If your repository includes a working `environment.yml`, create/activate it; otherwise ensure NumPy, pandas, rasterio, SciPy, GeoPandas and Shapely are installed, plus the routing notebook's dependencies.
+3.  Start Jupyter from **`Repository/` or `Repository/notebooks/`**, then open `notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb` and run all cells.
+4.  Confirm the printed validation checks and output `data/Murray_Buttes_Terrain_Data.csv` (17 columns).
+5.  Open the routing notebook, confirm that its input points to the generated master CSV and its expected columns are present, select valid start/destination grid coordinates, and run its cells.
+6.  Copy selected plots, warnings and summary tables into `results/` for reviewers.
 
 #### Relative paths and Jupyter's working directory
 
-Relative file paths are resolved from **`Path.cwd()`**, not automatically from the saved notebook's location. For example, with Jupyter running from `Repository/notebooks/`, `../data/raw/` reaches the input folder. From `Repository/`, the equivalent path is `data/raw/`. The data-preparation notebook's project-root search handles these two locations if the folder structure exists. If Jupyter starts outside the repository (for example in `Downloads/`), launch it inside the repository or explicitly set `PROJECT_DIR`; a local `%cd` is also a workaround but should **not** be hardcoded with a personal path in the public notebook.
+Relative file paths are resolved from **`Path.cwd()`**, not automatically from the saved notebook's location. For example, with Jupyter running from `Repository/notebooks/`, `../data/raw/` reaches the input folder. From `Repository/`, the equivalent path is `data/raw/`. Configure the notebook’s root path relative to its working directory, or use its project-root detection where available. If Jupyter starts outside the repository (for example in `Downloads/`), launch it inside the repository or explicitly set `PROJECT_DIR`; a local `%cd` is also a workaround but should **not** be hardcoded with a personal path in the public notebook.
 
 ## Routing settings
 
-The routing stage is **separate** from data preparation. The original routing documentation used a local root path and the old master CSV, so verify your route notebook's actual configuration before reproducing the example below. Start and goal are grid indices, not latitude/longitude. For the documented example, the test endpoints were `START = (400, 80)` and `GOAL = (100, 400)`.
+The routing stage is **separate** from data preparation. Start and goal are grid indices, not latitude/longitude. For the documented example, the test endpoints were `START = (400, 80)` and `GOAL = (100, 400)`. Use the configuration in the committed routing notebook when rerunning experiments.
 
-The historical routing notebook's experiment allowed reconstructed crossings (`ALLOW_RECONSTRUCTED_CROSSING = True`), with a maximum repair width of 8 cells and absolute movement grade limit 0.45; strict exclusion can be requested by setting `ALLOW_RECONSTRUCTED_CROSSING = False` if that option is present in the route notebook version used.
+The documented routing experiment allowed reconstructed crossings (`ALLOW_RECONSTRUCTED_CROSSING = True`), with a maximum repair width of 8 cells and absolute movement grade limit 0.45; strict exclusion can be requested by setting `ALLOW_RECONSTRUCTED_CROSSING = False` if that option is present in the route notebook version used.
 
 ### Key options
 
 | Setting | Default | Function |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `COMPARE_SHORTEST` | `True` | Add shortest-distance alternative |
 | `COMPARE_ROUGHNESS_AVOIDANCE` | `True` | Avoid top 10% roughness cells |
 | `COMPARE_BUTTE_AVOIDANCE` | `True` | Avoid mapped butte polygons |
@@ -173,16 +180,10 @@ The historical routing notebook's experiment allowed reconstructed crossings (`A
 
 ## Outputs
 
-The **documented routing notebook version** wrote its outputs to:
-
-```text
-ROOT/QGIS_Files/Route_Planner_Output_Repaired/
-```
-
-This is a historical output path; if the GitHub-ready notebook now writes to `results/`, update this section to match the version you actually commit. The data-preparation notebook instead writes the master CSV to `data/` and derived layers to `data/processed/`.
+The data-preparation notebook writes the master CSV to `data/` and derived layers to `data/processed/`. Routing exports are produced by the routing notebook at its configured output location. Selected figures and tables may be copied into `results/` for convenient review. The list below describes the documented routing outputs; exact paths depend on the committed notebook configuration.
 
 | Output | Contents |
-|------------------------------------|------------------------------------|
+|----|----|
 | `route_summary.csv` | Side-by-side route distance, energy, slope, roughness, geology, optical and reconstruction metrics |
 | `route_coordinates_and_cell_attributes.csv` | Cell-by-cell route locations and measured/derived attributes |
 | `route_movement_energy.csv` | Step-level energy breakdown |
@@ -203,7 +204,7 @@ This is a historical output path; if the GitHub-ready notebook now writes to `re
 With `START = (400, 80)` and `GOAL = (100, 400)`, the tested run produced:
 
 | Strategy | Distance | Minetti reference energy | Reconstructed cells crossed |
-|-----------------|------------------:|------------------:|------------------:|
+|----|---:|---:|---:|
 | Minimum energy | 473.210 m | 152.629 kJ | 3 |
 | Shortest distance | 457.151 m | 167.841 kJ | 3 |
 | Avoid roughest 10% | 532.056 m | 164.949 kJ | 4 |
