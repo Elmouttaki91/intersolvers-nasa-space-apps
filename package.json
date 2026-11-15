@@ -1,0 +1,22 @@
+{
+  "name": "intersolvers-nasa-space-apps",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Murray Buttes Marswalk — a layered, hyperlocal route map for a Mars astronaut (NASA Space Apps 2026, Interplanetary Survival Guide: Martian Map).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "data": "python scripts/prepare_data.py \"Asmaa Folder\""
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "^5.4.21"
+  }
+}
