@@ -1,8 +1,7 @@
 # Murray Buttes \| Mars Terrain Data Preparation & Explainable Route Planning
 
-An experimental, terrain-aware and explainable route-planning prototype for a hypothetical astronaut traverse in **Murray Buttes, Gale Crater, Mars**. The project combines two reproducible research stages: **(1) preparing a spatially aligned planetary terrain dataset** and **(2) comparing routes by modeled walking energy and terrain constraints**.
+An experimental, terrain-aware and explainable route-planning prototype for a hypothetical astronaut traverse in Murray Buttes, Gale Crater, Mars. The project combines two reproducible research stages: (1) preparing a spatially aligned planetary terrain dataset and (2) comparing routes by modeled walking energy and terrain constraints.
 
-**Project status:** Educational NASA Space Apps Challenge prototype, not a certified EVA navigation or hazard-assessment system.
 
 ## Important Note
 The original `Murray Buttes GIS.zip` dataset is not included in this repository because it exceeds GitHub's 100 MB file-size limit.
