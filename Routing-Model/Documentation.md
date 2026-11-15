@@ -1,16 +1,74 @@
-# Murray Buttes Route Planner
+# Murray Buttes | Mars Terrain Data Preparation & Explainable Route Planning
 
-This tool is a terrain aware, explainable route planning for a Mars walk in the Murray Buttes region of Gale Crater on Mars.
+An experimental, terrain-aware and explainable route-planning prototype for a hypothetical astronaut traverse in **Murray Buttes, Gale Crater, Mars**. The project combines two reproducible research stages: **(1) preparing a spatially aligned planetary terrain dataset** and **(2) comparing routes by modeled walking energy and terrain constraints**.
 
-## How does The Code Work 
+**Project status:** Educational NASA Space Apps Challenge prototype, not a certified EVA navigation or hazard-assessment system.
 
--   Accepts a start and destination coordinates in the `(row, column)` format.
+### At a glance
+
+- **248,502** cells on a **499 × 498** grid at approximately **1 m** spacing in the prepared study region.
+- **17** columns in the master terrain table exported by the data-preparation notebook.
+- Integrates elevation, slope, roughness, HiRISE optical features, qualitative THEMIS values, geological polygons, and an existing suspected-artifact flag.
+- Compares energy-minimizing routing with distance and optional avoidance alternatives; records reconstruction warnings and experimental uncertainty checks.
+
+## How the Code Works 
+
+-   Accepts start and destination coordinates in the `(row, column)` format.
 -   Calculates a minimum-energy route with 8-neighbor Dijkstra pathfinding.
 -   Optionally calculates shortest-distance, avoid roughest 10%, avoid mapped buttes, and combined-avoidance alternatives.
 -   Excludes **invalid terrain** and moves whose signed movement gradient exceeds the experimental limit of ±45% (about 24.2°). Diagonal corner-cutting across blocked edges is prohibited.
--   Exploraatory data analysis helped us identify an artifact corridor by interpolating elevations across short, bracketed flagged gaps. A warning pops out whenever the algorithm recommends going through it.
+-   Exploratory analysis identified a suspected DEM artifact corridor. The **routing** stage may interpolate short, bracketed flagged gaps; a warning is generated if a route traverses reconstructed terrain. The preparation stage does **not** overwrite missing or flagged DEM elevations.
 -   Summarizes route distance, reference energy, elevation change, gradients, roughness, butte intersections, HiRISE brightness/texture, and reconstructed crossings.
 -   Optionally runs **Monte Carlo sensitivity analysis after routing** and exports route maps, tables, coordinates, warning JSON, and audit data.
+
+## Two-stage workflow
+
+```text
+Six source inputs in data/raw/
+        |
+        v
+notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb
+        |  raster checks / terrain roughness / HiRISE texture
+        |  geology clipping and cell flags / THEMIS alignment
+        |  master-table validation
+        v
+data/Murray_Buttes_Terrain_Data.csv  (248,502 rows × 17 columns)
+        |
+        v
+Route-planning notebook (configure input CSV path if needed)
+        |
+        v
+Route alternatives + energy estimates + artifact warnings + figures
+```
+
+### Stage 1 — Data preparation and feature engineering
+
+**Notebook:** [`notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb`](notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb)
+
+1. **Validate grid alignment.** Read the 1 m DEM, slope raster and 0.25 m HiRISE image; check coverage, raster shape, coordinate systems and transforms. The preparation notebook intentionally stops when required spatial assumptions fail.
+2. **Calculate roughness.** Fit a local plane to valid **3 × 3 DEM** windows; derive residual surface variation rather than treating steepness itself as roughness.
+3. **Extract image features.** Compute HiRISE brightness and **5 × 5 image-pixel** texture; aggregate RGB and texture to each 1 m DEM cell. Image appearance is not a validated rock/soil classifier.
+4. **Integrate geology.** Unpack and clip mapped vector features to the study area; associate mapped butte polygons with grid cells.
+5. **Align THEMIS.** Reproject/resample the coarse **qualitative thermal-inertia** product onto the analysis grid for comparison. This **does not** increase its original physical resolution, and its image values are not calibrated thermal-inertia measurements.
+6. **Flag suspected artifacts.** Read an **existing** aligned artifact mask into `artifact_suspected`. The preparation notebook does not create or independently validate that mask and **does not interpolate DEM values**.
+7. **Validate/export.** Verify expected column names, one unique `(row, col)` per cell, grid bounds and flag consistency. Write and read back `data/Murray_Buttes_Terrain_Data.csv`.
+
+The master CSV contains the following **17 columns**:
+
+```text
+row, col, x_mars, y_mars, elevation_m, slope_deg, roughness_m,
+themis_qualitative, valid_terrain, texture_mean, texture_max,
+butte_id, inside_butte, red_mean, green_mean, blue_mean,
+artifact_suspected
+```
+
+**Note:** `valid_terrain` reflects nonmissing elevation, slope and roughness in the *source master table*. It is not a Go/Caution/No-go astronaut safety label. Likewise, `artifact_suspected` indicates an existing data-quality flag, not necessarily a permanently impassable location.
+
+### Stage 2 — Route evaluation
+
+The routing notebook uses the prepared terrain information to evaluate permitted movements with 8-neighbor Dijkstra pathfinding, compare objectives, and produce interpretable route statistics and warnings. Its reference walking-energy model, constraints and illustrative test outputs are documented below.
+
+**Integration check before a fresh run:** The supplied route-planning documentation refers to the older input `Murray_Buttes_Master_Data/Terrain/Master_Terrain_v3.csv`. Point the routing notebook at the new `data/Murray_Buttes_Terrain_Data.csv` **only after checking that its expected columns and settings match**. The route-planning notebook itself was not part of the uploaded files inspected for this README, so end-to-end execution with the new table has not been independently verified here.
 
 ## Data sources and how they are used
 
@@ -31,7 +89,7 @@ Three independent data-source families have meaningful roles in the planner: **D
 -   Master grid: 499 rows × 498 columns, at approximately 1 m spacing.
 -   Start/end inputs use grid (row, column), not latitude/longitude.
 -   The master table also stores projected Mars coordinates (`x_mars`, `y_mars`). These are not Earth WGS84 coordinates.
--   The geology GeoJSON preserves Mars-projected coordinates; align it with the HiRISE/terrain raster before displaying it in a React map. Do not directly assume default Earth longitude/latitude handling.
+-   Any GeoJSON exported for the web map must preserve or explicitly transform the Mars-projected geometry; align it with the HiRISE/terrain raster before displaying it in a React map. Do not directly assume default Earth longitude/latitude handling.
 
 ## Routing method
 
@@ -52,71 +110,52 @@ Dijkstra minimizes the sum of permitted movement costs. The notebook evaluates t
 
 ## Suspected DEM artifact: reconstruction and warnings
 
-A narrow suspected elevation artifact was identified in the DEM and saved in the master CSV as `artifact_suspected`. Rather than treating the entire region as impassable, we reconstructed elevations across narrow gaps using linear interpolation between between valid elevation measurements on either side
+A narrow suspected elevation artifact was identified in the DEM and saved in the master CSV as `artifact_suspected`. Rather than treating the entire region as impassable, we reconstructed elevations across narrow gaps using linear interpolation between valid elevation measurements on either side.
 
 > The routing algorithm can cross reconstructed cells if the estimated gradients satisfy its constraints. However, these elevations remain flagged as **inferred and unverified**, and the model automatically issues a warning whenever a route crosses them.
 
 ## Repository layout
 
-A suggested GitHub structure is:
-
-``` text
-marswalk-route-planner/
+```text
+Repository/
 ├── README.md
-├── environment.yml
+├── environment.yml                  # if included in the repository
 ├── notebooks/
-│   └── Murray_Buttes_Route_Planner_Final_With_Warnings.ipynb
+│   ├── Murray_Buttes_Data_Preparation_GitHub.ipynb
+│   └── Murray_Buttes_Route_Planner.ipynb  # rename to your actual filename if different
 ├── data/
-│   └── Murray_Buttes_Geology_Mars.geojson
-└── results/
-    ├── route_summary.csv                  # example output
-    ├── route_artifact_warnings.json       # example output
-    └── route_overview_and_zoom.png        # example figure
+│   ├── raw/
+│   │   ├── MSLGaleDEM_MAP2_EQUI.tif
+│   │   ├── Murray Buttes Slope.tif
+│   │   ├── Murray Buttes Imagery.tif
+│   │   ├── Gale_crater_THEMIS_qualTI.tif
+│   │   ├── Murray Buttes GIS.zip
+│   │   └── Murray_Artifact_Suspected_Full.tif
+│   ├── processed/                     # generated GeoTIFFs and geology layers
+│   └── Murray_Buttes_Terrain_Data.csv # generated master grid
+└── results/                           # selected route plots and tables
 ```
 
-The required **`Master_Terrain_v3.csv`** and optional HiRISE raster can be kept outside GitHub if too large for browser upload. Document their download/source location for reproducibility; avoid publishing third-party datasets without checking attribution and redistribution terms. Generated outputs can be added selectively as examples.
+The six files inside `data/raw/` are **inputs** to the preprocessing notebook. Some original source rasters can exceed GitHub's file-size limit; if they are not distributed in the repository, download them separately and place them at the exact paths shown above. The **suspected-artifact mask is a project-specific prerequisite**; the preprocessing notebook does not regenerate it from the DEM. The existing README source links document upstream data provenance, but do not by themselves reproduce every project-specific cropped input.
 
-### Required input files on a local computer
+### Run in order
 
-The current notebook expects these paths, relative to the configured `ROOT` directory:
+1. Clone/download the repository and ensure `notebooks/` and `data/raw/` exist **locally**, not only on GitHub.
+2. Install the required Python packages. If your repository includes a working `environment.yml`, create/activate it; otherwise ensure NumPy, pandas, rasterio, SciPy, GeoPandas and Shapely are installed, plus the routing notebook's dependencies.
+3. Start Jupyter from **`Repository/` or `Repository/notebooks/`**, then open `notebooks/Murray_Buttes_Data_Preparation_GitHub.ipynb` and run all cells.
+4. Confirm the printed validation checks and output `data/Murray_Buttes_Terrain_Data.csv` (17 columns).
+5. Configure the route-planning notebook's master-CSV input path/schema as needed, choose valid start/destination grid coordinates, and run its cells.
+6. Copy selected plots, warnings and summary tables into `results/` for reviewers.
 
-``` text
-ROOT/
-├── Murray_Buttes_Master_Data/
-│   └── Terrain/
-│       └── Master_Terrain_v3.csv    # required
-└── QGIS_Files/
-    └── Murray Buttes Imagery.tif   # optional visual overlay
-```
+#### Relative paths and Jupyter's working directory
 
-`Master_Terrain_v3.csv` includes the `artifact_suspected` flag, along with terrain, geological, and HiRISE-derived attributes. The separate `Murray_Artifact_Suspected_Full.tif` is useful for a map overlay but is **not required by the notebook's calculations**. The optional butte-avoidance route uses `inside_butte` already included in the master CSV; the GeoJSON is useful for visualizing polygons.
+Relative file paths are resolved from **`Path.cwd()`**, not automatically from the saved notebook's location. For example, with Jupyter running from `Repository/notebooks/`, `../data/raw/` reaches the input folder. From `Repository/`, the equivalent path is `data/raw/`. The data-preparation notebook's project-root search handles these two locations if the folder structure exists. If Jupyter starts outside the repository (for example in `Downloads/`), launch it inside the repository or explicitly set `PROJECT_DIR`; a local `%cd` is also a workaround but should **not** be hardcoded with a personal path in the public notebook.
 
-## Installation and running
+## Routing settings
 
-1.  Install **Miniconda** or **Anaconda**.
+The routing stage is **separate** from data preparation. The original routing documentation used a local root path and the old master CSV, so verify your route notebook's actual configuration before reproducing the example below. Start and goal are grid indices, not latitude/longitude. For the documented example, the test endpoints were `START = (400, 80)` and `GOAL = (100, 400)`.
 
-2.  From a terminal in the folder containing `environment.yml`:
-
-    ``` bash
-    conda env create -f environment.yml
-    conda activate nasa-data
-    python -m notebook
-    ```
-
-    The shared `nasa-data-portable.yml` can be renamed to `environment.yml` for this layout. Depending on the operating system and package availability, environment adjustments may be necessary.
-
-3.  Open `notebooks/Murray_Buttes_Route_Planner_Final_With_Warnings.ipynb`.
-
-4.  In its main code cell, update the local root and desired endpoints:
-
-    ``` python
-    ROOT = Path(r"C:\Users\Admin\Downloads\Murray")  # change for your computer
-    START = (400, 80)  # grid row, column
-    GOAL = (100, 400)  # grid row, column
-    PROMPT_FOR_ENDPOINTS = False  # set True to enter endpoints when running
-    ```
-
-5.  Run the notebook. Use different valid endpoints to generate new routes; no endpoints are silently relocated. To disable reconstructed crossings and use strict exclusion, set `ALLOW_RECONSTRUCTED_CROSSING = False`.
+The historical routing notebook's experiment allowed reconstructed crossings (`ALLOW_RECONSTRUCTED_CROSSING = True`), with a maximum repair width of 8 cells and absolute movement grade limit 0.45; strict exclusion can be requested by setting `ALLOW_RECONSTRUCTED_CROSSING = False` if that option is present in the route notebook version used.
 
 ### Key options
 
@@ -134,11 +173,13 @@ ROOT/
 
 ## Outputs
 
-By default, the notebook writes to:
+The **documented routing notebook version** wrote its outputs to:
 
-``` text
+```text
 ROOT/QGIS_Files/Route_Planner_Output_Repaired/
 ```
+
+This is a historical output path; if the GitHub-ready notebook now writes to `results/`, update this section to match the version you actually commit. The data-preparation notebook instead writes the master CSV to `data/` and derived layers to `data/processed/`.
 
 | Output | Contents |
 |------------------------------------|------------------------------------|
@@ -157,7 +198,7 @@ ROOT/QGIS_Files/Route_Planner_Output_Repaired/
 
 **Results are recomputed when the notebook runs.** The output folder reflects the current endpoints; preserve representative outputs elsewhere before running a different journey if you want to keep both.
 
-## Example result: journey across the suspected seam
+## Example results: journey across the suspected seam
 
 With `START = (400, 80)` and `GOAL = (100, 400)`, the tested run produced:
 
@@ -180,7 +221,7 @@ The minimum-energy route's reconstructed crossing affected approximately **4.24 
 -   Suspected DEM artifact cells and interpolated elevations are uncertain, and reconstructed crossings require explicit warning.
 -   Monte Carlo uses hypothetical DEM-error magnitudes and correlation, evaluates routes *after* selection, and does not fully capture reconstruction error.
 -   THEMIS thermal inertia was assessed but excluded from the final objective because it did not meaningfully improve the tested route selection; it is not a temperature or traction map.
--   Radiation exposure, time-varying temperature, validated obstacle detection, and real-world astronaut safety are not established by this prototype..
+-   Radiation exposure, time-varying temperature, validated obstacle detection, and real-world astronaut safety are not established by this prototype.
 
 ## Data Provenance, Citations, and Licensing
 
@@ -200,7 +241,7 @@ This project integrates publicly available planetary datasets from NASA missions
 
 The DEM integrates topographic information derived from Mars Reconnaissance Orbiter HiRISE and CTX observations, Mars Express HRSC data, and Mars Global Surveyor MOLA elevation control.
 
-The project uses a cropped, map-projected DEM to calculate elevation differences, walking gradients, and predicted walking-energy costs.
+The project uses a cropped, map-projected DEM to calculate elevation differences, walking gradients, roughness features and predicted walking-energy costs.
 
 **Usage terms:** The USGS product record specifies no use restrictions and requests attribution to the authors.
 
@@ -214,7 +255,7 @@ The project uses a cropped, map-projected DEM to calculate elevation differences
 
 **Source:** <https://astrogeology.usgs.gov/search/map/mars_msl_gale_merged_orthophoto_mosaic_25cm>
 
-The project uses 0.25 m/pixel imagery for surface visualization and derives RGB brightness and local image-texture measurements for route characterization.
+The project uses 0.25 m/pixel imagery for surface visualization and derives RGB brightness and local image-texture measurements for route characterization; optical features are not direct terrain-safety labels.
 
 **Image credit:** NASA/JPL/University of Arizona.
 
@@ -240,7 +281,7 @@ HiRISE usage policy: <https://www.uahirise.org/media/usage.php>
 
 The project uses mapped butte polygons and geological identifiers to support geological visualization and an optional butte-avoidance routing constraint.
 
-The source geological data were converted from GeoPackage (`.gpkg`) to GeoJSON (`.geojson`) for integration into the interactive Mars map. The underlying geometries and geological identifiers were preserved.
+Geological source layers are also clipped and processed into a GeoPackage during data preparation. For web mapping, a separate GeoJSON export may be used; confirm that its coordinate reference system is interpreted correctly and that geometries and identifiers are preserved.
 
 **Related scientific publication:**
 
@@ -322,7 +363,7 @@ The following datasets and calculations were generated or processed as part of t
 
 -   Route-level environmental statistics and warning records.
 
-These are derived or processed products, not independent NASA measurements. The original source datasets should be cited when using or redistributing the derived results.
+These are derived or processed products, not independent NASA measurements. The original source datasets should be cited when using or redistributing the derived results. The new data-preparation notebook exports the 17-column `data/Murray_Buttes_Terrain_Data.csv` rather than replacing source measurements with interpolated elevations.
 
 In particular, reconstructed DEM elevations are estimates rather than verified measurements. Routes crossing these cells are explicitly flagged.
 
